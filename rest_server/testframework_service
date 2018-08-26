@@ -1,0 +1,69 @@
+#!/usr/bin/python
+import sys
+import os
+from signal import SIGTERM
+import inspect
+import types
+class Service():
+    def __init__(self, service_bin):
+        self._pidfile = service_bin + '.pid'
+        self.sevice_bin = service_bin
+
+    def _write_pid(self):
+        pid = os.fork()
+        if pid > 0:
+            sys.exit(0)
+        with open(self._pidfile, 'w') as f:
+            print >> f, os.getpid()
+
+    def start(self):
+        if os.path.exists(self._pidfile):
+            print "Service start -- service pid exist"
+        self._write_pid()
+        print "Service started succefully--",self._pidfile
+        self._run()
+
+    def stop(self):
+        if os.path.exists(self._pidfile):
+            with open(self._pidfile, 'r') as f:
+                pid = int(f.read().strip())
+            os.remove(self._pidfile)
+            os.kill(pid, SIGTERM)
+            print "Service stopped succefully--", self._pidfile
+        else:
+            print "Service stop -- Failed"
+
+    def restart(self):
+        self.stop()
+        self.start()
+
+    def _run(self):
+        import time
+        while True:
+            time.sleep(5)
+            #todo lets do the test framework service layer
+
+def do_main():
+    if(len(sys.argv[1:]) > 1):
+        print "too many arguments"
+        sys.exit(-1)
+    elif(len(sys.argv[1:]) == 0):
+        print "Please specify start,stop or restart"
+        sys.exit(-1)
+    service = Service(sys.argv[0])
+    funcs =  inspect.getmembers(service)
+    _found = 0
+    supported_ops = []
+    for f in funcs[:]:
+        if(type(f[1]) == types.MethodType) and (f[0].startswith("_") is False):
+            supported_ops.append(f[0])
+            if(sys.argv[1:][0] == f[0]):
+                getattr(service, f[0])()
+                _found = 1
+                break
+    if(_found == 0):
+        print "Please specify:",supported_ops
+        sys.exit(-1)
+
+if __name__ == "__main__":
+    do_main()
